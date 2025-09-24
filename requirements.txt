@@ -1,0 +1,10 @@
+streamlit
+pandas
+tqdm
+google-api-python-client
+sentence-transformers
+transformers
+torch
+scikit-learn
+langdetect
+nltk
