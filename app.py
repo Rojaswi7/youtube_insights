@@ -58,7 +58,8 @@ if run_button:
         # Clean video labels (titles if you fetch them; else IDs)
                        cluster_counts.index = [video_titles.get(vid, vid) for vid in cluster_counts.index]  
         
-                      st.bar_chart(cluster_counts)
+                       st.bar_chart(cluster_counts)
                 else:
                   st.warning("No clusters available yet. Try analyzing more comments.")
+
 
