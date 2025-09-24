@@ -47,5 +47,18 @@ if run_button:
                         st.write("- ", ex)
 
                 st.header("Cross-video cluster counts")
-                pivot = pd.pivot_table(df_all[~df_all['is_spam']], index='cluster', columns='video_id', values='comment_id', aggfunc='count', fill_value=0)
-                st.dataframe(pivot)
+                if summaries:
+                   for cluster_id, summary in enumerate(summaries):
+                       st.subheader(f"Cluster {cluster_id + 1} — Keywords: {', '.join(summary['keywords'])}")
+                       st.write(f"📊 Sentiment → {summary['sentiment']}")
+        
+        # Bar chart: count of comments in this cluster per video
+                       cluster_counts = df_all[df_all['cluster'] == cluster_id].groupby('video_id')['comment_id'].count()
+        
+        # Clean video labels (titles if you fetch them; else IDs)
+                       cluster_counts.index = [video_titles.get(vid, vid) for vid in cluster_counts.index]  
+        
+                      st.bar_chart(cluster_counts)
+                else:
+                  st.warning("No clusters available yet. Try analyzing more comments.")
+
