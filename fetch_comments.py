@@ -1,0 +1,88 @@
+# fetch_comments.py
+import re
+from googleapiclient.discovery import build
+from urllib.parse import urlparse, parse_qs
+from tqdm import tqdm
+
+def extract_video_id(url_or_id: str):
+    """Extract video ID from URL or return if already ID"""
+    if re.match(r'^[A-Za-z0-9_-]{11}$', url_or_id):
+        return url_or_id
+    try:
+        parsed = urlparse(url_or_id)
+        if parsed.hostname in ("www.youtube.com", "youtube.com"):
+            q = parse_qs(parsed.query)
+            return q.get("v", [None])[0]
+        if parsed.hostname == "youtu.be":
+            return parsed.path.lstrip('/')
+    except Exception:
+        return None
+    return None
+
+def fetch_comments_for_video(video_id: str, api_key: str, max_comments: int = 1000):
+    youtube = build("youtube", "v3", developerKey=api_key)
+    comments = []
+    next_page_token = None
+    fetched = 0
+    pbar = tqdm(total=max_comments, desc=f"Fetching comments for {video_id}")
+    while fetched < max_comments:
+        request = youtube.commentThreads().list(
+            part="snippet,replies",
+            videoId=video_id,
+            pageToken=next_page_token,
+            maxResults=100
+        )
+        resp = request.execute()
+        items = resp.get("items", [])
+        for item in items:
+            snippet = item["snippet"]["topLevelComment"]["snippet"]
+            text_val = snippet.get("textDisplay", "").strip()
+            if text_val:
+                comments.append({
+                    "video_id": video_id,
+                    "comment_id": item["id"],
+                    "author": snippet.get("authorDisplayName"),
+                    "text": text_val,
+                    "published_at": snippet.get("publishedAt")
+                })
+                fetched += 1
+                pbar.update(1)
+            if fetched >= max_comments:
+                break
+
+            # include replies
+            replies = item.get("replies", {}).get("comments", [])
+            for rep in replies:
+                r_snip = rep["snippet"]
+                r_text = r_snip.get("textDisplay", "").strip()
+                if r_text:
+                    comments.append({
+                        "video_id": video_id,
+                        "comment_id": rep["id"],
+                        "author": r_snip.get("authorDisplayName"),
+                        "text": r_text,
+                        "published_at": r_snip.get("publishedAt")
+                    })
+                    fetched += 1
+                    pbar.update(1)
+                    if fetched >= max_comments:
+                        break
+            if fetched >= max_comments:
+                break
+
+        next_page_token = resp.get("nextPageToken")
+        if not next_page_token:
+            break
+    pbar.close()
+    return comments
+
+def fetch_comments_for_videos(video_list, api_key, max_comments_per_video=500):
+    all_comments = []
+    for v in video_list:
+        vid = extract_video_id(v.strip())
+        if not vid:
+            print(f"Could not parse video id from: {v}")
+            continue
+        cs = fetch_comments_for_video(vid, api_key, max_comments=max_comments_per_video)
+        all_comments.extend(cs)
+    return all_comments
